@@ -54,18 +54,20 @@ error_t create_dot_image_next_array_dump(list_t *list) {
         int end = list->next[current];
         if (count_els > list->size) {
             add_error(ERR_CYCLING_LIST, " ");
+            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\", fillcolor=\"#e93131b4\"]\n", current);
             fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid cycle\"]\n"
                         "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", count, current, count);
             break;
         }
         if (end > (int) list->capacity || end < -2 || (end == -1 && current != list->head)) {
+            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\", fillcolor=\"#e93131b4\"]\n", current);
             fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid next\"]\n"
                         "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", count, current, count);
             add_error(ERR_INCORRECT_LIST, " ");
             break;
         }
         if (end != POISON)
-            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#00c414ff\", minlen=4]\n", current, end);
+            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#2f00ffff\", minlen=4]\n", current, end);
         current = end;
         count_els++;
     }
@@ -85,10 +87,11 @@ error_t create_dot_image_next_array_dump(list_t *list) {
 error_t create_dot_main_array_dump(list_t *list, FILE * fp) {
     fprintf(fp, "\ndigraph {\nrankdir=LR\nbgcolor=\"#ffffff\"\n"
                 "ranksep=0.0\nsplines=ortho\n"
-                "node[shape=record,color=\"#000000ff\", fontcolor=\"#000000ff\", style=\"filled\", fillcolor=\"#22c85682\"]\n");
+                "node[shape=record,color=\"#000000ff\", fontcolor=\"#000000ff\", style=\"filled\", fillcolor=\"#87ef8782\"]\n");
     char * str_if_head = "| <FONT COLOR=\"#ff0000ff\"> HEAD</FONT> ";
-    char * str_if_tail = "| <FONT COLOR=\"ORANGE\">TAIL</FONT> ";
-    char * str_if_free = "| <FONT COLOR=\"BLUE\">  FREE</FONT> ";
+    char * str_if_tail = "| <FONT COLOR=\"#7300ffff\">TAIL</FONT> ";
+    char * str_if_free = "| <FONT COLOR=\"MAGENTA\">  FREE</FONT> ";
+
     int head = list->head;
     int tail = list->tail;
     int free = (int) get_top(list->free);
@@ -97,8 +100,12 @@ error_t create_dot_main_array_dump(list_t *list, FILE * fp) {
             fprintf(fp, "data_array_info%zu[label=<index in array: %zu | value: <FONT COLOR=\"magenta\">PSN</FONT> | {prev: %d | next: %d}", i, i, -1, -1);
         else
             fprintf(fp, "data_array_info%zu[label=<index in array: %zu | value: <FONT COLOR=\"red\">%d</FONT>   | {prev: %d | next: %d}", i, i, list->data[i], list->prev[i], list->next[i]);
-        fprintf(fp, " %s %s %s>]\n", (i == head) ? str_if_head : " ", (i == tail) ? str_if_tail : " ", (i == free) ? str_if_free : " ");
+        if (i != 0)
+            fprintf(fp, " %s %s %s>]\n", (i == head) ? str_if_head : " ", (i == tail) ? str_if_tail : " ", (i == free) ? str_if_free : " ");
+        else
+            fprintf(fp, " %s %s %s>, fillcolor=\"#8059596e\"]\n", (i == head) ? str_if_head : " ", (i == tail) ? str_if_tail : " ", (i == free) ? str_if_free : " ");
         }
+    
     for (size_t i = 0; i < list->capacity - 1; i++) {
         fprintf(fp, "data_array_info%zu->", i);
     }
@@ -131,13 +138,15 @@ error_t create_dot_image_prev_array_dump(list_t *list) {
         int end = list->prev[current];
         if (count_els > list->size) {
             add_error(ERR_CYCLING_LIST, " ");
+            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\", fillcolor=\"#e93131b4\"]\n", current);
             fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid cycle\"]\n"
                         "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", count, current, count);
             break;
         }
         
         if (end > (int) list->capacity || end < -2 || (end == -1 && current != list->tail)) {
-            fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid prev\"]\n"
+            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", current);
+            fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid prev\", fillcolor=\"#e93131b4\"]\n"
                         "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]", count, current, count);
             add_error(ERR_INCORRECT_LIST, " ");
             break;
