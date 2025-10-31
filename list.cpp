@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#define ERROR_ADD_DEBUG
 #include "sassert.h"
 #include "error_manage.h"
 #include "better_output.h"
@@ -70,6 +71,7 @@ void * safe_realloc(void ** memory, size_t new_size) {
 
 error_t add_element_before_internal(list_t *list, size_t index, int value) {
     sassert(list, ERR_PTR_NULL);
+
     if (index > list->size || index < 1) {
         add_error(ERR_INVALID_INDEX, " index=%d size=%d", index, list->size);
         return error;
@@ -104,8 +106,23 @@ error_t add_element_before_internal(list_t *list, size_t index, int value) {
     return error;
 }
 
+error_t add_in_head(list_t *list, int value) {
+    sassert(list, ERR_PTR_NULL);
+
+    add_element_after_internal(list, list->head, value);
+    return error;
+}
+
 error_t add_element_after_internal(list_t * list, size_t index, int value) {
     sassert(list, ERR_PTR_NULL);
+
+    verify_list(list);
+    if (error.is_error == true)
+        return error;
+    
+    if (index == 0)
+        index = list->head;
+    
     if (index > list->size + 1 || index < 0) {
         add_error(ERR_INVALID_INDEX, " index=%d size=%d", index, list->size);
         return error;
@@ -118,6 +135,7 @@ error_t add_element_after_internal(list_t * list, size_t index, int value) {
         list->capacity *= 2;
     }
 
+
     int free = 0;
     stackPop(list->free, &free);
 
@@ -125,6 +143,7 @@ error_t add_element_after_internal(list_t * list, size_t index, int value) {
     if (list->size++ == 0) {
         return error;
     }
+
     if (index == list->head) {
         list->next[list->head] = free;
         list->prev[free] = list->head;
@@ -198,8 +217,10 @@ int main(void) {
     add_element_after(list, 1, 11);
     add_element_after(list, 2, 12);
     add_element_after(list, 3, 13);
-    list->prev[3] = -1;
     add_element_after(list, 4, 14);
+    add_element_after(list, 0, 20);
+    add_element_before(list, 1, 100);
+
     listDtor(list);
     // open_live_server(dump_site_file_name);
     return 0;

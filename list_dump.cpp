@@ -2,7 +2,6 @@
 #include <string.h>
 #include <ctype.h>
 
-#define ERROR_ADD_DEBUG
 #include "sassert.h"
 #include "error_manage.h"
 #include "better_output.h"
@@ -120,9 +119,6 @@ int verify_list(list_t *list) {
         if (list->prev[current] > size + 1 || list->prev[current] < -1) {
             add_error(ERR_INVALID_PREV, "%d", current);
         }
-        if (current != tail && (list->prev[current] == -1 || current != list->next[previous])) {
-            add_error(ERR_INVALID_RELATION_WITH_PREV, "%d", current);
-        }
         if (current != head && (list->next[current] == -1 || current != list->prev[list->next[current]])) {
             add_error(ERR_INVALID_RELATION_WITH_NEXT, "%d", current);
         }
@@ -182,20 +178,6 @@ void print_error_to_dot_image(list_t *list, FILE *fp) {
                     
                     err_count++;
                     break;
-                case ERR_INVALID_RELATION_WITH_PREV:
-                    if (index < 0)
-                        break;
-                    
-                    fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", index);
-                    fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", style=\"filled\", fillcolor=\"#e93131b4\", minlen=4, label=\"invalid relation\"]\n"
-                                "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", err_count, index, err_count);
-                    if (list->prev[index] > 0 && list->prev[index] < list->size) {
-                        fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", list->prev[index]);
-                        fprintf(fp, "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", list->prev[index], err_count);
-                    }
-                    
-                    err_count++; // todo ask why i cant place ++ in fprintf
-                    break;
             }
         }
         errors >>= 1;
@@ -235,18 +217,23 @@ error_t create_dot_image_dump(list_t *list) {
     fprintf(fp, "}");
     fclose(fp);
     char command[MAX_STR_SIZE] = {};
-    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%zu.png", count++);
+    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%zu.png", count);
     if (system(command) != 0) {
         add_error(ERR_CMD_INVALID, "%s", command);
     }
     return error;
 }
 
-void print_to_html(list_t *list, operations operation, size_t index, int value) {
+error_t print_to_html(list_t *list, operations operation, size_t index, int value) {
     sassert(list, ERR_PTR_NULL);
+
+    verify_list(list);
+    if (error.is_error == true)
+        return error;
 
     FILE * fp = fopen(dump_site_file_name, "a");
     sassert(fp, ERR_PTR_NULL);
+
 
     if (operation == START)
         fprintf(fp, "<p style=\"color: #a30f7eff; font-weight: bold; \">||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||</p>\n");
@@ -273,10 +260,13 @@ void print_to_html(list_t *list, operations operation, size_t index, int value) 
     if (!error.is_error) {
         print_order_of_data(fp, list);
     }
+
     fprintf(fp,     "\nhead: %d\ntail: %d\nfree: %d\nsize: %d\n</pre>\n", list->head, list->tail, list->free, list->size);
     fprintf(fp,     "<div class=\"images\">\n"
                     "<img src=\"graph/graph%zu.png\" class=\"img1\">\n</div>\n",  count);
+    count++;
     fclose(fp);
+    return error;
 }
 
 void print_site_headers() {

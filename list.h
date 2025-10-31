@@ -76,9 +76,10 @@ enum operations {
     print_to_html(list, START, index, value);\
 \
     add_element_after_internal(list, index, value);\
-    print_to_html(list, ADD_AFTER, index, value);\
 \
     create_dot_image_dump(list);\
+    print_to_html(list, ADD_AFTER, index, value);\
+\
     add_error_to_html(list, index, value);}
     
     
@@ -88,9 +89,10 @@ enum operations {
     print_to_html(list, START, index, value);\
 \
     add_element_before_internal(list, index, value);\
-    print_to_html(list, ADD_BEFORE, index, value);\
 \
     create_dot_image_dump(list);\
+    print_to_html(list, ADD_BEFORE, index, value);\
+\
     add_error_to_html(list, index, value);}
 
 
