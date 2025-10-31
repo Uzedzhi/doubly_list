@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ctype.h>
 
+#define ERROR_ADD_DEBUG
 #include "sassert.h"
 #include "error_manage.h"
 #include "better_output.h"
@@ -119,9 +120,11 @@ int verify_list(list_t *list) {
         if (list->prev[current] > size + 1 || list->prev[current] < -1) {
             add_error(ERR_INVALID_PREV, "%d", current);
         }
-        if (current != tail && (list->prev[current] == -1 || current != list->next[previous]) ||
-            current != head && (list->next[current] == -1 || current != list->prev[list->next[current]])) {
-            add_error(ERR_INVALID_RELATION, "%d", list->next[current]);
+        if (current != tail && (list->prev[current] == -1 || current != list->next[previous])) {
+            add_error(ERR_INVALID_RELATION_WITH_PREV, "%d", current);
+        }
+        if (current != head && (list->next[current] == -1 || current != list->prev[list->next[current]])) {
+            add_error(ERR_INVALID_RELATION_WITH_NEXT, "%d", current);
         }
         previous = current;
         current = list->next[current];
@@ -165,7 +168,21 @@ void print_error_to_dot_image(list_t *list, FILE *fp) {
                                 "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", err_count, name, showed_index, err_count);
                     err_count++;
                     break;
-                case ERR_INVALID_RELATION:
+                case ERR_INVALID_RELATION_WITH_NEXT:
+                    if (index < 0)
+                        break;
+                    
+                    fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", index);
+                    fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", style=\"filled\", fillcolor=\"#e93131b4\", minlen=4, label=\"invalid relation\"]\n"
+                                "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", err_count, index, err_count);
+                    if (list->next[index] > 0 && list->next[index] < list->size) {
+                        fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", list->next[index]);
+                        fprintf(fp, "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", list->next[index], err_count);
+                    }
+                    
+                    err_count++;
+                    break;
+                case ERR_INVALID_RELATION_WITH_PREV:
                     if (index < 0)
                         break;
                     
@@ -177,7 +194,7 @@ void print_error_to_dot_image(list_t *list, FILE *fp) {
                         fprintf(fp, "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", list->prev[index], err_count);
                     }
                     
-                    err_count++; // todo why i cant place ++ if fprintf
+                    err_count++; // todo ask why i cant place ++ in fprintf
                     break;
             }
         }
@@ -197,20 +214,20 @@ error_t create_dot_image_dump(list_t *list) {
     if (error.is_error == true)
         print_error_to_dot_image(list, fp);
     
-    while (current > -1 && current <= list->size + 1 && count_els++ <= list->size + 1) {
+    while (current > -1 && current <= list->size + 1 && count_els++ <= list->size + 2) {
         int next = list->next[current];
         if (next > -1 && next <= list->size + 1)
-            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#0d00ffff\", minlen=4]\n", current, next);
+            fprintf(fp, "data_array_info%zu->data_array_info%zu [constraint=false, weight=1,color=\"#0d00ffff\", minlen=4]\n", current, next);
         current = next;
         count_els++;
     }
 
     current = list->head;
     count_els = 0;
-    while (current > -1 && current <= list->size + 1 && count_els++ <= list->size + 1) {
+    while (current > -1 && current <= list->size + 1 && count_els++ <= list->size + 2) {
         int prev = list->prev[current];
         if (prev > -1 && prev <= list->size + 1)
-            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#0d00ffff\", minlen=4]\n", current, prev);
+            fprintf(fp, "data_array_info%zu->data_array_info%zu [constraint=false, weight=1,color=\"#ff0084ff\", minlen=4]\n", current, prev);
         current = prev;
         count_els++;
     }

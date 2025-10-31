@@ -198,7 +198,7 @@ int main(void) {
     add_element_after(list, 1, 11);
     add_element_after(list, 2, 12);
     add_element_after(list, 3, 13);
-    list->prev[2] = 690;
+    list->prev[3] = -1;
     add_element_after(list, 4, 14);
     listDtor(list);
     // open_live_server(dump_site_file_name);

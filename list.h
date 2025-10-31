@@ -29,20 +29,21 @@ typedef struct {
 } list_t;
 
 #define x(n) \
-    n(ERR_PTR_NULL          ,    0) \
-    n(ERR_CMD_INVALID       ,    1) \
-    n(ERR_INVALID_INDEX     ,    2) \
-    n(ERR_OUT_OF_BOUNDS     ,    3) \
-    n(ERR_NOTHING_TO_POP    ,    4) \
-    n(ERR_INVALID_OPERATION ,    5) \
-    n(ERR_REALLOC_FAIL      ,    6) \
-    n(ERR_INCORRECT_LIST    ,    7) \
-    n(ERR_CYCLING_LIST      ,    8) \
-    n(ERR_INVALID_ARGUMENTS ,    9) \
-    n(ERR_INVALID_RELATION  ,   10) \
-    n(ERR_INVALID_PREV      ,   11) \
-    n(ERR_INVALID_NEXT      ,   12) \
-    n(ERR_INVALID_SIZE      ,   13)
+    n(ERR_PTR_NULL                      ,   0) \
+    n(ERR_CMD_INVALID                   ,   1) \
+    n(ERR_INVALID_INDEX                 ,   2) \
+    n(ERR_OUT_OF_BOUNDS                 ,   3) \
+    n(ERR_NOTHING_TO_POP                ,   4) \
+    n(ERR_INVALID_OPERATION             ,   5) \
+    n(ERR_REALLOC_FAIL                  ,   6) \
+    n(ERR_INCORRECT_LIST                ,   7) \
+    n(ERR_CYCLING_LIST                  ,   8) \
+    n(ERR_INVALID_ARGUMENTS             ,   9) \
+    n(ERR_INVALID_PREV                  ,   10) \
+    n(ERR_INVALID_NEXT                  ,   11) \
+    n(ERR_INVALID_SIZE                  ,   12) \
+    n(ERR_INVALID_RELATION_WITH_PREV    ,   13) \
+    n(ERR_INVALID_RELATION_WITH_NEXT    ,   14)
 #define init_enum(val, ind) \
     val = ind,
 #define init_str(val, ...) \
