@@ -40,50 +40,6 @@ void print_site_toes() {
     
 }
 
-error_t create_dot_image_next_array_dump(list_t *list) {
-    sassert(list, ERR_PTR_NULL);
-
-    FILE * fp = fopen(dump_graph_file_name, "w");
-    sassert(fp, ERR_PTR_NULL);
-
-    create_dot_main_array_dump(list, fp);
-    int current     = list->tail;
-    int count_tails = 0;
-    int count_els   = 0;
-    while (current != POISON) {
-        int end = list->next[current];
-        if (count_els > list->size) {
-            add_error(ERR_CYCLING_LIST, " ");
-            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\", fillcolor=\"#e93131b4\"]\n", current);
-            fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid cycle\"]\n"
-                        "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", count, current, count);
-            break;
-        }
-        if (end > (int) list->capacity || end < -2 || (end == -1 && current != list->head)) {
-            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\", fillcolor=\"#e93131b4\"]\n", current);
-            fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid next\"]\n"
-                        "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", count, current, count);
-            add_error(ERR_INCORRECT_LIST, " ");
-            break;
-        }
-        if (end != POISON)
-            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#2f00ffff\", minlen=4]\n", current, end);
-        current = end;
-        count_els++;
-    }
-
-    fprintf(fp, "}");
-    fclose(fp);
-
-    char command[MAX_STR_SIZE] = {};
-    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%zu.png", count);
-    if (system(command) != 0) {
-        add_error(ERR_CMD_INVALID, "%s", command);
-    }
-
-    return error;
-}
-
 error_t create_dot_main_array_dump(list_t *list, FILE * fp) {
     fprintf(fp, "\ndigraph {\nrankdir=LR\nbgcolor=\"#ffffff\"\n"
                 "ranksep=0.0\nsplines=ortho\n"
@@ -116,51 +72,153 @@ error_t create_dot_main_array_dump(list_t *list, FILE * fp) {
 void add_error_to_html(list_t *list, int index, int value) {
     sassert(list, ERR_PTR_NULL);
 
-    FILE * fp = fopen(dump_site_file_name, "a");
-    sassert(fp, ERR_PTR_NULL);
-    fprintf(fp, "<div style=\"width:180px; background-color: #ff0000c5; height:90px; position:fixed; top:20px; right:20px;border-radius: 5px;\">");
-    if (error.error_info[ERR_INCORRECT_LIST][0] != '\0')
-        fprintf(fp, "error with connections at index %d, value %d", index, value);
-    if (error.error_info[ERR_CYCLING_LIST][0] != '\0')
-        fprintf(fp, " and your list is cycling at index %d, value %d", index, value);
-    fprintf(fp, "</div>");
-    fclose(fp);
+    if (error.is_error == true) {
+        FILE * fp = fopen(dump_site_file_name, "a");
+        sassert(fp, ERR_PTR_NULL);
+        fprintf(fp, "<div class=\"error_div\">");
+
+        int count = 0;
+        int errors = error.code;
+        int err_count = 0;
+        while (errors > 0) {
+            if ((errors & 1) == 1) {
+                fprintf(fp, "<p> %s: at %s index</p>", error_text[count], error.error_info[count]);
+            }
+            count++;
+            errors >>= 1;
+        }
+        fprintf(fp, "</div>");
+        fclose(fp);
+    }
 }
 
-error_t create_dot_image_prev_array_dump(list_t *list) {
+int verify_list(list_t *list) {
+    sassert(list, ERR_PTR_NULL);
+
+    int free = (int) get_top(list->free);
+    int tail = list->tail;
+    int head = list->head;
+    int current = tail;
+    int size = list->size;
+    int previous = 0;
+    int count_els = 0;
+    if (tail < 1 || head < 1 || free < 1 || size < 0) {
+        add_error(ERR_INVALID_ARGUMENTS, "tail: %d, head: %d, free: %d, size: %d", tail, head, free, size);
+        return 0;
+    }
+
+    while (current != POISON) {
+        if (count_els++ > size + 1) {
+            add_error(ERR_INVALID_SIZE, "size: %d, count_els: %d", size, count_els);
+            break;
+        }
+        if (current < -1 || current > size + 1 || list->next[current] > size + 1 || list->next[current] < -1) {
+            add_error(ERR_INVALID_NEXT, "%d", current);
+            break;
+        }
+        if (list->prev[current] > size + 1 || list->prev[current] < -1) {
+            add_error(ERR_INVALID_PREV, "%d", current);
+        }
+        if (current != tail && (list->prev[current] == -1 || current != list->next[previous]) ||
+            current != head && (list->next[current] == -1 || current != list->prev[list->next[current]])) {
+            add_error(ERR_INVALID_RELATION, "%d", list->next[current]);
+        }
+        previous = current;
+        current = list->next[current];
+    }
+    if (count_els > size + 1) {
+        add_error(ERR_INVALID_SIZE, "size: %d, count_els: %d", size, count_els);
+    }
+    return current;
+}
+
+void print_error_to_dot_image(list_t *list, FILE *fp) {
+    sassert(fp,     ERR_PTR_NULL);
+    sassert(list,   ERR_PTR_NULL);
+
+    int count = 0;
+    int errors = error.code;
+    int err_count = 0;
+
+    while (errors > 0) {
+        if ((errors & 1) == 1) {
+            int index = atoi(error.error_info[(int) count]);
+            int showed_index = index;
+            const char * name = "";
+            switch((lstErrors) count) {
+                case ERR_INVALID_PREV:
+                case ERR_INVALID_NEXT:
+                    if (index < 0)
+                        break;
+                    if ((lstErrors) count == ERR_INVALID_PREV)
+                        name = "prev";
+                    else 
+                        name = "next";
+                    
+                    if ((lstErrors) count == ERR_INVALID_PREV && list->prev[index] > 0 && list->prev[index] <= list->size) 
+                        showed_index = list->prev[index];
+                    else if ((lstErrors) count == ERR_INVALID_NEXT && list->next[index] > 0 && list->next[index] <= list->size)
+                        showed_index = list->next[index];
+                    
+                    fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", showed_index);
+                    fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, style=\"filled\", fillcolor=\"#e93131b4\", label=\"invalid %s\"]\n"
+                                "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", err_count, name, showed_index, err_count);
+                    err_count++;
+                    break;
+                case ERR_INVALID_RELATION:
+                    if (index < 0)
+                        break;
+                    
+                    fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", index);
+                    fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", style=\"filled\", fillcolor=\"#e93131b4\", minlen=4, label=\"invalid relation\"]\n"
+                                "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", err_count, index, err_count);
+                    if (list->prev[index] > 0 && list->prev[index] < list->size) {
+                        fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", list->prev[index]);
+                        fprintf(fp, "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", list->prev[index], err_count);
+                    }
+                    
+                    err_count++; // todo why i cant place ++ if fprintf
+                    break;
+            }
+        }
+        errors >>= 1;
+        count++;
+    }
+}
+
+error_t create_dot_image_dump(list_t *list) {
     FILE * fp = fopen(dump_graph_file_name, "w");
     sassert(fp, ERR_PTR_NULL);
 
     create_dot_main_array_dump(list, fp);
-    int current = list->head;
+    int current = list->tail;
     int count_els = 0;
-    while (current != POISON) {
-        int end = list->prev[current];
-        if (count_els > list->size) {
-            add_error(ERR_CYCLING_LIST, " ");
-            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\", fillcolor=\"#e93131b4\"]\n", current);
-            fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid cycle\"]\n"
-                        "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]\n", count, current, count);
-            break;
-        }
-        
-        if (end > (int) list->capacity || end < -2 || (end == -1 && current != list->tail)) {
-            fprintf(fp, "data_array_info%zu[fillcolor=\"#e93131b4\"]\n", current);
-            fprintf(fp, "error%zu[weight=1,color=\"#ff0000ff\", minlen=4, label=\"invalid prev\", fillcolor=\"#e93131b4\"]\n"
-                        "data_array_info%zu->error%zu[weight=1,color=\"#ff0000ff\", minlen=4]", count, current, count);
-            add_error(ERR_INCORRECT_LIST, " ");
-            break;
-        }
-        if (end != POISON)
-            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#0d00ffff\", minlen=4]\n", current, end);
-        
-        current = end;
+    int error_element = verify_list(list);
+    if (error.is_error == true)
+        print_error_to_dot_image(list, fp);
+    
+    while (current > -1 && current <= list->size + 1 && count_els++ <= list->size + 1) {
+        int next = list->next[current];
+        if (next > -1 && next <= list->size + 1)
+            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#0d00ffff\", minlen=4]\n", current, next);
+        current = next;
         count_els++;
     }
+
+    current = list->head;
+    count_els = 0;
+    while (current > -1 && current <= list->size + 1 && count_els++ <= list->size + 1) {
+        int prev = list->prev[current];
+        if (prev > -1 && prev <= list->size + 1)
+            fprintf(fp, "data_array_info%zu->data_array_info%zu [weight=1,color=\"#0d00ffff\", minlen=4]\n", current, prev);
+        current = prev;
+        count_els++;
+    }
+
     fprintf(fp, "}");
     fclose(fp);
     char command[MAX_STR_SIZE] = {};
-    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%zu_prev.png", count++);
+    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%zu.png", count++);
     if (system(command) != 0) {
         add_error(ERR_CMD_INVALID, "%s", command);
     }
@@ -200,80 +258,13 @@ void print_to_html(list_t *list, operations operation, size_t index, int value) 
     }
     fprintf(fp,     "\nhead: %d\ntail: %d\nfree: %d\nsize: %d\n</pre>\n", list->head, list->tail, list->free, list->size);
     fprintf(fp,     "<div class=\"images\">\n"
-                    "<img src=\"graph/graph%zu.png\" class=\"img1\">\n"
-                    "<img src=\"graph/graph%zu_prev.png\" class=\"img2\">\n</div>\n",  count, count);
+                    "<img src=\"graph/graph%zu.png\" class=\"img1\">\n</div>\n",  count);
     fclose(fp);
 }
 
 void print_site_headers() {
     FILE * fp = fopen(dump_site_file_name, "w");
     sassert(fp, ERR_PTR_NULL);
-
-    // fprintf(fp, "<!DOCTYPE html>\n"
-    //             "<html lang=\"ru\">\n"
-    //             "<head>\n"
-    //             "<style>\n"
-    //             ".add_after, .remove, .add_before{\n"
-    //             "color: #00ff9dc5;\n"
-    //             "}\n"
-    //             ".start {\n"
-    //             "color: #b2ec06ff;\n"
-    //             "}\n"
-    //             "h2, p{\n"
-    //             "margin: 0;\n"
-    //             "}\n"
-    //             "h2 {\n"
-    //             "color: #a30f7eff;\n"
-    //             "font-weight: bold;\n"
-    //             "}\n"
-    //             "label.check {\n"
-    //             "position: fixed;\n"
-    //             "top: 20px;\n"
-    //             "left: 30px;\n"
-    //             "background: #00ff9dc5;\n"
-    //             "color: black;\n"
-    //             "padding: 10px 15px;\n"
-    //             "cursor: pointer;\n"
-    //             "display: inline-block;\n"
-    //             "z-index: 9999;\n"
-    //             "border-radius: 5px;\n"
-    //             "}\n"
-    //             "label.check:hover {\n"
-    //             "background: #00ff9dff;\n"
-    //             "}\n"
-    //             "body {\n"
-    //             "background-color: black;\n"
-    //             "}\n"
-    //             "input[type=\"checkbox\"] {\n"
-    //             "display: none;\n"
-    //             "}\n"
-    //             "label {\n"
-    //                 "background: #8df4cca4;\n"
-    //                 "color: black;\n"
-    //                 "padding: 5px 10px;\n"
-    //                 "cursor: pointer;\n"
-    //                 "display: inline-block;\n"
-    //                 "margin: 5px 0;\n"
-    //             "}\n"
-    //             ".images {\n"
-    //                 "position: relative;\n"
-    //                 "display: inline-block;\n"
-    //                 "height: 230px;\n"
-    //             "}\n"
-    //             ".images .img1, .images .img2 {\n"
-    //                 "position: absolute;\n"
-    //                 "top: 0;\n"
-    //                 "left: 0;\n"
-    //             "}\n"
-    //             ".images .img1 { opacity: 1; }\n"
-    //             ".images .img2 { opacity: 0; }\n"
-    //             "input:checked ~ .images .img1 { opacity: 0; }\n"
-    //             "input:checked ~ .images .img2 { opacity: 1; }\n"
-    //             "</style>\n"
-    //             "<title>my list dump</title>\n"
-    //             "</head>\n"
-    //             "<body width=\"device-width\">\n"
-    //         );
     fprintf(fp, "<!DOCTYPE html>\n"
                 "<html lang=\"ru\">\n"
                 "<head>\n"
@@ -291,23 +282,18 @@ void print_site_headers() {
                 "color: rgb(30, 0, 255);\n"
                 "font-weight: bold;\n"
                 "}\n"
-                "label.check {\n"
-                "position: fixed;\n"
+                ".error_div {\n"
+                "padding: 10px;\n"
+                "background-color: #d82727a5;\n"
+                "position:fixed;\n"
                 "top: 20px;\n"
-                "left: 30px;\n"
-                "background: #ff9f0fd5;\n"
-                "color: rgb(0, 0, 0);\n"
-                "padding: 10px 15px;\n"
-                "cursor: pointer;\n"
-                "display: inline-block;\n"
-                "z-index: 9999;\n"
+                "right: 20px;\n"
                 "border-radius: 5px;\n"
+                "z-index: 9999;\n"
                 "}\n"
-                "label.check:hover {\n"
-                "background: #00ff9dff;\n"
-                "}\n"
-                "input[type=\"checkbox\"] {\n"
-                "display: none;\n"
+                ".error_div:hover{\n"
+                "background-color: #d82727e5;\n"
+                "cursor: pointer;\n"
                 "}\n"
                 "label {\n"
                 "background: #8df4cca4;\n"
@@ -322,22 +308,11 @@ void print_site_headers() {
                     "display: inline-block;\n"
                     "height: 230px;\n"
                 "}\n"
-                ".images .img1, .images .img2 {\n"
-                    "position: absolute;\n"
-                    "top: 0;\n"
-                    "left: 0;\n"
-                "}\n"
-                ".images .img1 { opacity: 1; }\n"
-                ".images .img2 { opacity: 0; }\n"
-                "input:checked ~ .images .img1 { opacity: 0; }\n"
-                "input:checked ~ .images .img2 { opacity: 1; }\n"
                 "</style>\n"
                 "<title>my list dump</title>\n"
                 "</head>\n"
                 "<body width=\"device-width\">\n"
             );
-    fprintf(fp, "<input type=\"checkbox\", id =\"t1\">\n"
-                "<label for=\"t1\", class=\"check\">change</label>\n");
     fclose(fp);
 }
 
