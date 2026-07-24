@@ -3,6 +3,7 @@
 
 #include "my_libs/sassert.hpp"
 #include "my_libs/error_manage.hpp"
+#include "list_values.h"
 #include "list_dump.h"
 #include "list.h"
 
@@ -180,7 +181,7 @@ void add_element_before_internal(list_t *list, size_t index, list_el_t value) {
 void listCtor(list_t *list) {
     listCtor_internal(list);\
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         print_site_headers();
     #endif
 }
@@ -188,7 +189,7 @@ void listCtor(list_t *list) {
 void listDtor(list_t *list) {
     listDtor_internal(list);\
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         print_site_toes();
     #endif
 }
@@ -202,14 +203,14 @@ void add_before(list_t *list, int index, list_el_const_t value) {
         list_el_t data = value;
     #endif
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         create_dot_image_dump(list);
         print_to_html(list, START, index, data);
     #endif
 
     add_element_before_internal(list, index, data);    
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         create_dot_image_dump(list);
         print_to_html(list, ADD_BEFORE, index, data);
     #endif
@@ -224,14 +225,14 @@ void add_after(list_t *list, int index, list_el_const_t value) {
         list_el_t data = value;
     #endif
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         create_dot_image_dump(list);
         print_to_html(list, START, index, data);
     #endif
 
     add_element_after_internal(list, index, data);    
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         create_dot_image_dump(list);
         print_to_html(list, ADD_AFTER, index, data);
     #endif
@@ -253,14 +254,14 @@ void append(list_t *list, list_el_const_t value) {
 void remove(list_t *list, int index) {
     sassert(list, ERR_PTR_NULL);
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         create_dot_image_dump(list);
         print_to_html(list, START, index, (list_el_t) DATA_POISON);
     #endif
 
     remove_element_internal(list, index);    
 
-    #ifndef NDEBUG
+    #ifndef NDUMP
         create_dot_image_dump(list);
         print_to_html(list, REMOVE, index, (list_el_t) DATA_POISON);
     #endif

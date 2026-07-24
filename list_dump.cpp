@@ -3,6 +3,7 @@
 
 #include "my_libs/sassert.hpp"
 #include "my_libs/error_manage.hpp"
+#include "list_values.h"
 #include "list.h"
 #include "list_dump.h"
 
@@ -332,7 +333,7 @@ void print_site_headers() {
     fclose(fp);
 }
 
-#ifndef NDEBUG
+#ifndef NDUMP
 error_t open_live_server(const char * site_name) {
     sassert(site_name, ERR_PTR_NULL);
 
