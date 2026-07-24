@@ -1,16 +1,96 @@
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 
 #define ERROR_ADD_DEBUG
-#include "sassert.h"
-#include "error_manage.h"
-#include "better_output.h"
-#include "sys/stat.h"
-#include "../stack/stack.h"
+#include "my_libs/sassert.hpp"
+#include "my_libs/error_manage.hpp"
 #include "list_dump.h"
-#include "list_unitest.h"
 #include "list.h"
+
+#define SAFE_FREE(el) \
+    if (el)\
+        free(el);
+
+error_t error = {};
+
+void * safe_realloc(void ** memory, size_t new_size) {
+    sassert(memory, ERR_PTR_NULL);
+
+    void *temp = realloc(*memory, new_size);
+    if (temp == NULL) {
+        add_error(ERR_REALLOC_FAIL, "couldn't enlarge your array");
+        return NULL;
+    }
+    *memory = temp;
+    return *memory;
+}
+
+void add_element_after_internal(list_t * list, size_t index, int value) {
+    sassert(list, ERR_PTR_NULL);
+    
+    if (index > list->size)
+        return;
+
+    if (list->size == list->capacity) {
+        safe_realloc((void **) &list->data, list->capacity * 2);
+        safe_realloc((void **) &list->next, list->capacity * 2);
+        safe_realloc((void **) &list->prev, list->capacity * 2);
+        list->capacity *= 2;
+    }
+
+    int free = list->last_free;
+    list->last_free = list->free[free];
+    list->data[free] = value;
+
+    int next = list->next[index];
+    list->next[free] = next;
+    list->prev[next] = free;
+    list->next[index] = free;
+
+    if (list->size)
+        list->prev[free] = index;
+    if (index == list->head)
+        list->head = free;
+        
+    list->size++;
+    return;
+}
+
+void remove_element_internal(list_t *list, int index) {
+    sassert(list, ERR_PTR_NULL);
+    
+    if (list->size == 0 || index < 0 || index >= list->capacity || list->data[index] == POISON)
+        return;
+
+    list->free[index] = list->last_free;
+    list->last_free   = index;
+
+    int prev = list->prev[index];
+    int next = list->next[index];
+    list->next[prev] = list->next[index];
+    list->prev[next] = prev;
+
+    list->data[index] = POISON;
+    list->next[index] = POISON;
+    list->prev[index] = POISON;
+    list->size--;
+    return;
+}
+
+void listDtor_internal(list_t *list) {
+    if (list == NULL)
+        return;
+    
+    if (list->data != NULL)
+        free(list->data);
+    if (list->prev != NULL)
+        free(list->prev);
+    if (list->next != NULL)
+        free(list->next);
+    if (list->free != NULL)
+        free(list->free);
+    return;
+}
 
 void initialize_with_poison(int * array) {
     for (size_t i = 0; i < START_LIST_SIZE; i++) {
@@ -28,17 +108,11 @@ void print_order_of_data(FILE * fp, list_t *list) {
     }
 }
 
-error_t listCtor_internal(list_t *list) {
+void listCtor_internal(list_t *list) {
     sassert(list, ERR_PTR_NULL);
 
     list->tail = INITIAL_TAIL_VAL;
     list->head = INITIAL_HEAD_VAL;
-
-    init_stack(free, START_LIST_SIZE);
-    list->free = free;
-    for (size_t i = START_LIST_SIZE; i > 0; i--) {
-        stackPush(list->free, i);
-    }
 
     list->size = 0;
     list->capacity = START_LIST_SIZE;
@@ -50,178 +124,123 @@ error_t listCtor_internal(list_t *list) {
     sassert(list->next, ERR_PTR_NULL);
     initialize_with_poison(list->next);
 
+    list->next[0] = 1;
+
     list->prev = (int *) calloc(START_LIST_SIZE, sizeof(int));
     sassert(list->prev, ERR_PTR_NULL);
     initialize_with_poison(list->prev);
 
-    return error;
-}
-
-void * safe_realloc(void ** memory, size_t new_size) {
-    sassert(memory, ERR_PTR_NULL);
-
-    void *temp = realloc(*memory, new_size);
-    if (temp == NULL) {
-        add_error(ERR_REALLOC_FAIL, "couldn't enlarge your array");
-        return NULL;
+    list->free = (int *) calloc(START_LIST_SIZE, sizeof(int));
+    sassert(list->free, ERR_PTR_NULL);
+    for (size_t i = 0; i < START_LIST_SIZE - 1; i++) {
+        list->free[i] = i + 1;
     }
-    *memory = temp;
-    return *memory;
+    list->free[START_LIST_SIZE - 1] = POISON;
+    list->last_free = INITIAL_FREE_VAL;
+
+    return;
 }
 
-error_t add_element_before_internal(list_t *list, size_t index, int value) {
+void add_element_before_internal(list_t *list, size_t index, int value) {
     sassert(list, ERR_PTR_NULL);
 
-    if (index > list->size || index < 1) {
-        add_error(ERR_INVALID_INDEX, " index=%d size=%d", index, list->size);
-        return error;
+    if (index > list->size) {
+        return;
     }
+
     if (list->size == list->capacity) {
         safe_realloc((void **) &list->data, list->capacity * 2);
         safe_realloc((void **) &list->next, list->capacity * 2);
         safe_realloc((void **) &list->prev, list->capacity * 2);
         list->capacity *= 2;
     }
-    int free = 0;
-    stackPop(list->free, (stack_var_t *) &free);
 
-    list->data[free] = value;
+    int free            = list->last_free;
+    list->last_free     = list->free[list->last_free];
+    list->data[free]    = value;
 
-    if (list->size++ == 0) {
-        return error;
-    }
+    list->prev[free]    = list->prev[index];
+    list->next[free]    = index;
 
-    if (index != list->tail) {
-        list->prev[free]                = list->prev[index];
-        list->next[list->prev[index]]   = free;
-    }
+    if (index != list->tail) 
+        list->next[list->prev[index]] = free;
     else
         list->tail = free;
 
-    list->prev[index] = free;
-
-    if (index != list->head + 1)
-        list->next[free] = index;
-
-    return error;
+    list->prev[index]   = free;
+    list->size++;
+    return;
 }
 
-error_t add_in_head(list_t *list, int value) {
+void listCtor(list_t *list) {
+    listCtor_internal(list);\
+
+    #ifndef NDEBUG
+        print_site_headers();
+    #endif
+}
+
+void listDtor(list_t *list) {
+    listDtor_internal(list);\
+
+    #ifndef NDEBUG
+        print_site_toes();
+    #endif
+}
+
+void add_before(list_t *list, int index, int value) {
+    sassert(list, ERR_PTR_NULL);
+
+    #ifndef NDEBUG
+        create_dot_image_dump(list);
+        print_to_html(list, START, index, value);
+    #endif
+
+    add_element_before_internal(list, index, value);    
+
+    #ifndef NDEBUG
+        create_dot_image_dump(list);
+        print_to_html(list, ADD_BEFORE, index, value);
+    #endif
+}
+
+void add_after(list_t *list, int index, int value) {
+    sassert(list, ERR_PTR_NULL);
+
+    #ifndef NDEBUG
+        create_dot_image_dump(list);
+        print_to_html(list, START, index, value);
+    #endif
+
+    add_element_after_internal(list, index, value);    
+
+    #ifndef NDEBUG
+        create_dot_image_dump(list);
+        print_to_html(list, ADD_AFTER, index, value);
+    #endif
+}
+
+void append(list_t *list, int value) {
     sassert(list, ERR_PTR_NULL);
 
     add_element_after_internal(list, list->head, value);
-    return error;
+    return;
 }
 
-error_t add_element_after_internal(list_t * list, size_t index, int value) {
+void remove(list_t *list, int index) {
     sassert(list, ERR_PTR_NULL);
 
-    verify_list(list);
-    if (error.is_error == true)
-        return error;
-    
-    if (index == 0)
-        index = list->head;
-    
-    if (index > list->size + 1 || index < 0) {
-        add_error(ERR_INVALID_INDEX, " index=%d size=%d", index, list->size);
-        return error;
-    }
+    #ifndef NDEBUG
+        create_dot_image_dump(list);
+        print_to_html(list, START, index, POISON);
+    #endif
 
-    if (list->size == list->capacity) {
-        safe_realloc((void **) &list->data, list->capacity * 2);
-        safe_realloc((void **) &list->next, list->capacity * 2);
-        safe_realloc((void **) &list->prev, list->capacity * 2);
-        list->capacity *= 2;
-    }
+    remove_element_internal(list, index);    
 
-
-    int free = 0;
-    stackPop(list->free, &free);
-
-    list->data[free] = value;
-    if (list->size++ == 0) {
-        return error;
-    }
-
-    if (index == list->head) {
-        list->next[list->head] = free;
-        list->prev[free] = list->head;
-        list->head = free;
-        return error;
-    }
-
-    list->next[free]                = list->next[index];
-    list->prev[list->next[index]]   = free;
-    list->next[index]               = free;
-    list->prev[free]                = index;
-    return error;
+    #ifndef NDEBUG
+        create_dot_image_dump(list);
+        print_to_html(list, REMOVE, index, POISON);
+    #endif
 }
 
-error_t remove_element_internal(list_t *list, int index) {
-    sassert(list, ERR_PTR_NULL);
-    
-    if (index < 0 || index >= list->capacity || list->data[index] == POISON) {
-        add_error(ERR_OUT_OF_BOUNDS, "index:%d", index);
-        return error;
-    }
-
-    if (list->size == 0) {
-        add_error(ERR_NOTHING_TO_POP, "size = 0");
-        return error;
-    }
-
-    stackPush(list->free, index);
-
-    if (list->size == 1) {
-        list->head = INITIAL_HEAD_VAL;
-        list->tail = INITIAL_TAIL_VAL;
-    }
-    else if (index == list->head) {
-        list->head = list->prev[list->head];
-        list->next[list->prev[index]] = POISON;
-    }
-    else if (index == list->tail) {
-        list->tail = list->next[index];
-    }
-    else {
-        list->next[list->prev[index]] = list->next[index];
-    }
-
-    list->data[index] = POISON;
-    list->next[index] = POISON;
-    list->prev[index] = POISON;
-    list->size--;
-    return error;
-}
-
-error_t listDtor_internal(list_t *list) {
-    if (list == NULL)
-        return error;
-    
-    if (list->data != NULL)
-        free(list->data);
-    if (list->prev != NULL)
-        free(list->prev);
-    if (list->next != NULL)
-        free(list->next);
-    if (list->free != NULL)
-        stackDtor(list->free);
-    free(list);
-    return error;
-}
-
-int main(void) {
-    listCtor(list);
-    add_element_after(list, 0, 10);
-    add_element_after(list, 1, 11);
-    add_element_after(list, 2, 12);
-    add_element_after(list, 3, 13);
-    add_element_after(list, 4, 14);
-    add_element_after(list, 0, 20);
-    add_element_before(list, 1, 100);
-
-    listDtor(list);
-    // open_live_server(dump_site_file_name);
-    return 0;
-}
+#undef SAFE_FREE

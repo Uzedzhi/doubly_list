@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <string.h>
-#include <ctype.h>
 
-#include "sassert.h"
-#include "error_manage.h"
-#include "better_output.h"
-#include "sys/stat.h"
-#include "../stack/stack.h"
+#include "my_libs/sassert.hpp"
+#include "my_libs/better_output.hpp"
 #include "list.h"
 #include "list_dump.h"
+
+void initialize_with_poison(int * array);
 
 operations get_operation(char * operation) {
     for (size_t i = 0; i < sizeof(operations_classes) / sizeof(char *); i++) {
@@ -55,12 +53,10 @@ void reinitialize_list(list_t *list) {
     list->tail = INITIAL_TAIL_VAL;
     list->head = INITIAL_HEAD_VAL;
 
-    stackDtor(list->free);
 
-    init_stack(free, START_LIST_SIZE);
-    list->free = free;
+    list->last_free = 0;
     for (size_t i = START_LIST_SIZE; i > 0; i--) {
-        stackPush(list->free, i);
+        list->free[i] = i + 1;
     }
 
     list->size = 0;
@@ -77,7 +73,9 @@ int unitest_list() {
     sassert(fp, ERR_PTR_NULL);
 
     char command_line[MAX_STR_SIZE] = {};
-    listCtor(list);
+
+    list_t list = {};
+    listCtor(&list);
     int count = 0;
     while (fgets(command_line, MAX_STR_SIZE, fp) != NULL) {
         char operation_str[MAX_STR_SIZE] = {};
@@ -87,13 +85,13 @@ int unitest_list() {
             operations operation = get_operation(operation_str);
             switch(operation) {
                 case ADD_AFTER:
-                    add_element_after(list, index, value);
+                    add_after(&list, index, value);
                     break;
                 case ADD_BEFORE:
-                    add_element_before(list, index, value);
+                    add_before(&list, index, value);
                     break;
                 case REMOVE:
-                    remove_element(list, index);
+                    remove(&list, index);
                     break;
                 case UNDEF_OPERATION:
                     break;
@@ -103,7 +101,7 @@ int unitest_list() {
             }
         }
         else {
-            bool is_right = check_order(list, fp);
+            bool is_right = check_order(&list, fp);
             if (is_right)
                 printf(GREEN "test %d was done correctly\n" WHITE, count);
             else {
@@ -114,14 +112,14 @@ int unitest_list() {
                 printf("expected: ");
                 printf("%s", line_with_results);
                 printf("\ngot:");
-                print_order_of_data(stdout, list);
+                print_order_of_data(stdout, &list);
                 printf("\n");
             }
-            reinitialize_list(list);
+            reinitialize_list(&list);
             count++;
         }
     }
     printf(WHITE);
-    listDtor(list);
+    listDtor(&list);
     return true;
 }

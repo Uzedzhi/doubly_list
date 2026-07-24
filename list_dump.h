@@ -11,6 +11,7 @@ error_t create_dot_image_dump(list_t *list);
 void add_error_to_html(list_t *list, int index, int value);
 error_t create_dot_main_array_dump(list_t *list, FILE * fp);
 void print_site_toes();
+void print_site_headers();
 int verify_list(list_t *list);
 void print_info(list_t *list);
 
