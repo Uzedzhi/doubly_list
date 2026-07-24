@@ -5,23 +5,40 @@
 #include <stdio.h>
 #include "my_libs/error_manage.hpp"
 
+
+
 const  size_t START_LIST_SIZE   = 10;
-static size_t count             = 0;
 const  size_t MAX_STR_SIZE      = 200;
 const  size_t INITIAL_HEAD_VAL  = 0;
 const  size_t INITIAL_TAIL_VAL  = 0;
 const  size_t INITIAL_FREE_VAL  = 0;
 const  size_t MAX_TESTING_SIZE  = 100;
-const  int    POISON            = -1;
-
 typedef const char * const string;
+
+#ifdef STRING_TYPE
+    typedef char * list_el_t;
+    typedef string list_el_const_t;
+    string DATA_POISON = NULL;
+
+    #define DATA_SPEC "s"
+#else
+    typedef int list_el_t;
+    typedef int list_el_const_t;
+    const int DATA_POISON = -1;
+
+    #define DATA_SPEC "d"
+#endif // STRING_TYPE
+
+const int POISON = -1;
+
 string unitest_file_name    = "unitest.txt";
 string dump_graph_file_name = "graph.txt";
 string dump_site_file_name  = "dump.html";
 string operations_descriptions[]    = {"added after index to a list ", "before operation happened ", "after removal from list ", "added before index to the list "};
 string operations_classes[]         = {"add_after", "start", "remove", "add_before"};
 typedef struct {
-    int *data;
+
+    list_el_t *data;
     int *next;
     int *prev;
     int *free;
@@ -33,6 +50,12 @@ typedef struct {
     size_t size;
     size_t capacity;
 } list_t;
+
+#define initialize_with_poison(array, poison) {\
+    for (size_t _ = 0; _ < START_LIST_SIZE; _++) {\
+        array[_] = poison;\
+    }\
+}
 
 #define x(n) \
     n(ERR_PTR_NULL                      ,   0) \
@@ -71,7 +94,7 @@ enum operations {
 void listDtor(list_t *list);
 void listCtor(list_t *list);
 void remove(list_t *list, int index);
-void add_after(list_t *list, int index, int value);
-void add_before(list_t *list, int index, int value);
+void add_after(list_t *list, int index,  list_el_const_t value);
+void add_before(list_t *list, int index, list_el_const_t value);
 void print_order_of_data(FILE * fp, list_t *list);
 #endif // LIST_H

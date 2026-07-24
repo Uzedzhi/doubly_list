@@ -1,3 +1,3 @@
 LINUX_FLAGS="-O3 -fsanitize=address,alignment,bool,bounds,enum,float-cast-overflow,float-divide-by-zero,integer-divide-by-zero,leak,nonnull-attribute,null,object-size,return,returns-nonnull-attribute,shift,signed-integer-overflow,undefined,unreachable,vla-bound,vptr"
-g++ -L/home/uzedzhi/MyProjects/my_libs list.cpp list_dump.cpp list_unitest.cpp listmain.cpp $LINUX_FLAGS -o list -I/home/uzedzhi/MyProjects/doubly_list -lerror_manage
+g++ -DSTRING_TYPE listmain.cpp list.cpp list_dump.cpp list_unitest.cpp my_libs/error_manage.cpp $LINUX_FLAGS -o list -Imy_libs/
 ./list

@@ -8,10 +8,12 @@
 
 extern error_t error;
 
+static int count_graphs = 0;
+
 void print_info(list_t *list) {
     fprintf(stderr, "\ndata:     ");
     for (size_t i = 0; i < list->capacity; i++) {
-        fprintf(stderr, "[%-4d]", list->data[i]);
+        fprintf(stderr, "[%-4" DATA_SPEC "]", list->data[i]);
     }
     fprintf(stderr, "\nnext:     ");
     for (size_t i = 0; i < list->capacity; i++) {
@@ -54,10 +56,10 @@ error_t create_dot_main_array_dump(list_t *list, FILE * fp) {
     int tail = list->tail;
     int free = list->last_free;
     for (size_t i = 0; i < list->capacity; i++) {
-        if (list->data[i] == POISON)
+        if (list->data[i] == (list_el_t) DATA_POISON)
             fprintf(fp, "data_array_info%zu[label=<index in array: %zu | value: <FONT COLOR=\"magenta\">PSN</FONT> | {prev: %d | next: %d} | free: %d", i, i, -1, -1, list->free[i]);
         else
-            fprintf(fp, "data_array_info%zu[label=<index in array: %zu | value: <FONT COLOR=\"red\">%d</FONT>   | {prev: %d | next: %d} | free: %d", i, i, list->data[i], list->prev[i], list->next[i], list->free[i]);
+            fprintf(fp, "data_array_info%zu[label=<index in array: %zu | value: <FONT COLOR=\"red\">%" DATA_SPEC "</FONT>   | {prev: %d | next: %d} | free: %d", i, i, list->data[i], list->prev[i], list->next[i], list->free[i]);
         if (i != 0)
             fprintf(fp, " %s %s %s>]\n", (i == head) ? str_if_head : " ", (i == tail) ? str_if_tail : " ", (i == free) ? str_if_free : " ");
         else
@@ -71,7 +73,7 @@ error_t create_dot_main_array_dump(list_t *list, FILE * fp) {
     return error;
 }
 
-void add_error_to_html(list_t *list, int index, int value) {
+void add_error_to_html(list_t *list, int index, list_el_t value) {
     sassert(list, ERR_PTR_NULL);
 
     if (error.is_error == true) {
@@ -220,14 +222,14 @@ error_t create_dot_image_dump(list_t *list) {
     fprintf(fp, "}");
     fclose(fp);
     char command[MAX_STR_SIZE] = {};
-    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%zu.png", count);
+    snprintf(command, MAX_STR_SIZE - 1, "dot graph.txt -Gdpi=80 -Tpng -o graph/graph%d.png", count_graphs);
     if (system(command) != 0) {
         add_error(ERR_CMD_INVALID, "%s", command);
     }
     return error;
 }
 
-error_t print_to_html(list_t *list, operations operation, size_t index, int value) {
+error_t print_to_html(list_t *list, operations operation, size_t index, list_el_t value) {
     sassert(list, ERR_PTR_NULL);
 
     if (error.is_error == true)
@@ -240,14 +242,14 @@ error_t print_to_html(list_t *list, operations operation, size_t index, int valu
     if (operation == START)
         fprintf(fp, "<p style=\"color: #a30f7eff; font-weight: bold; \">||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||</p>\n");
 
-    if (value != POISON)
-        fprintf(fp, "<h2>%s at index: %zu, value: %d</h2>\n", operations_descriptions[operation], index, value);
+    if (value != (list_el_t) DATA_POISON)
+        fprintf(fp, "<h2>%s at index: %zu, value: %" DATA_SPEC "</h2>\n", operations_descriptions[operation], index, value);
     else 
         fprintf(fp, "<h2>%s at index: %zu, value: NONE</h2>\n", operations_descriptions[operation], index);
     fprintf(fp, "<pre class = \"%s\">\n", operations_classes[operation]);
     fprintf(fp, "\ndata:     ");
     for (size_t i = 0; i < list->capacity; i++) {
-        fprintf(fp, "[%-4d]", list->data[i]);
+        fprintf(fp, "[%-4" DATA_SPEC "]", list->data[i]);
     }
     fprintf(fp, "\nnext:     ");
     for (size_t i = 0; i < list->capacity; i++) {
@@ -270,8 +272,8 @@ error_t print_to_html(list_t *list, operations operation, size_t index, int valu
 
     fprintf(fp,     "\nhead: %d\ntail: %d\nlast_free: %d\nsize: %zu\n</pre>\n", list->head, list->tail, list->last_free, list->size);
     fprintf(fp,     "<div class=\"images\">\n"
-                    "<img src=\"graph/graph%zu.png\" class=\"img1\">\n</div>\n",  count);
-    count++;
+                    "<img src=\"graph/graph%d.png\" class=\"img1\">\n</div>\n",  count_graphs);
+    count_graphs++;
     fclose(fp);
     return error;
 }

@@ -6,8 +6,6 @@
 #include "list.h"
 #include "list_dump.h"
 
-void initialize_with_poison(int * array);
-
 operations get_operation(char * operation) {
     for (size_t i = 0; i < sizeof(operations_classes) / sizeof(char *); i++) {
         if (strcmp(operations_classes[i], operation) == 0) {
@@ -31,10 +29,14 @@ bool check_order(list_t *list, FILE *fp) {
     sassert(list,   ERR_PTR_NULL);
     sassert(fp,     ERR_PTR_NULL);
 
-    int value = 0;
+    list_el_t value = 0;
     int count = 0;
     int current = list->tail;
-    while ((fscanf(fp, "%d ", &value) == 1)) {
+    #ifdef STRING_TYPE
+        while ((fscanf(fp, "%s ", value) == 1)) {
+    #else
+        while ((fscanf(fp, "%d ", &value) == 1)) {
+    #endif
         if (count > list->size || list->data[current] != value) {
             return false;
         }
@@ -61,9 +63,9 @@ void reinitialize_list(list_t *list) {
 
     list->size = 0;
     list->capacity = START_LIST_SIZE;
-    initialize_with_poison(list->data);
-    initialize_with_poison(list->next);
-    initialize_with_poison(list->prev);
+    initialize_with_poison(list->data, (list_el_t) DATA_POISON);
+    initialize_with_poison(list->next, POISON);
+    initialize_with_poison(list->prev, POISON);
 }
 
 int unitest_list() {
@@ -80,8 +82,13 @@ int unitest_list() {
     while (fgets(command_line, MAX_STR_SIZE, fp) != NULL) {
         char operation_str[MAX_STR_SIZE] = {};
         int index = 0;
-        int value = 0;
+        list_el_t value = 0;
+        
+    #ifdef STRING_TYPE
+        if (sscanf(command_line, "%s %d %s", operation_str, &index, value) >= 2) {
+    #else
         if (sscanf(command_line, "%s %d %d", operation_str, &index, &value) >= 2) {
+    #endif
             operations operation = get_operation(operation_str);
             switch(operation) {
                 case ADD_AFTER:

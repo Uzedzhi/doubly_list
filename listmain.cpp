@@ -7,14 +7,14 @@ int main(void) {
     list_t list = {};
     listCtor(&list);
 
-    add_after(&list, 0, 9);
-    add_before(&list, 0, 10);
-    add_before(&list, 1, 11);
-    add_before(&list, 2, 12);
-    add_before(&list, 3, 13);
-    add_before(&list, 4, 14);
-    add_before(&list, 0, 20);
-    add_before(&list, 1, 100);
+    add_after(&list, 0,  "hi0");
+    add_before(&list, 0, "hi1");
+    add_before(&list, 1, "hi2");
+    add_before(&list, 2, "hi3");
+    add_before(&list, 3, "hi4");
+    add_before(&list, 4, "hi5");
+    add_before(&list, 0, "hi6");
+    add_before(&list, 1, "hi7");
 
     remove(&list, 3);
     remove(&list, 2);
