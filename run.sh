@@ -1,0 +1,2 @@
+LINUX_FLAGS="-O3 -fsanitize=address,alignment,bool,bounds,enum,float-cast-overflow,float-divide-by-zero,integer-divide-by-zero,leak,nonnull-attribute,null,object-size,return,returns-nonnull-attribute,shift,signed-integer-overflow,undefined,unreachable,vla-bound,vptr"
+g++ -DNSTRING_TYPE -DDEBUG src/listmain.cpp src/list.cpp src/list_dump.cpp src/list_unitest.cpp MyLibs/helper_funcs.cpp $LINUX_FLAGS -o bin/list
