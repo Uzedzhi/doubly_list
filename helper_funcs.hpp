@@ -13,5 +13,8 @@
 size_t GetFileSize(FILE *fp);
 char *GetBufferFromFile(FILE *fp, size_t FileSize);
 void *reallocate_array(void **array, size_t capacity, size_t new_bytes);
+FILE *fopen_with_dirs(const char *filename, const char *mode);
+int   create_parent_directories(const char *file_path);
+int InArray(int *Array, int size, int value);
 
 #endif // FILEHELPER_H
