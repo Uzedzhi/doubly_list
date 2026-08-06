@@ -40,7 +40,9 @@ enum LstErrors {
     _LST_ERR_PIPE_FAIL                  =   -15,
     _LST_ERR_PTR_NULL                   =   -16,
     _LST_NOK                            =   -17,
-    _LST_ERR_FILE_DOES_NOT_EXIST        =   -18
+    _LST_ERR_FILE_DOES_NOT_EXIST        =   -18,
+    _LST_ERR_MULTIPLE_CONNECTIONS_PREV  =   -19,
+    _LST_ERR_MULTIPLE_CONNECTIONS_NEXT  =   -20
 };
 
 typedef struct {
@@ -49,8 +51,6 @@ typedef struct {
     int *prev;
     int *free;
 
-    int tail;
-    int head;
     int last_free;
 
     int size;

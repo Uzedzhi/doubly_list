@@ -28,7 +28,7 @@ const  size_t START_LIST_SIZE   = 10;
 const  size_t MAX_STR_SIZE      = 200;
 const  size_t INITIAL_HEAD_VAL  = 0;
 const  size_t INITIAL_TAIL_VAL  = 0;
-const  size_t INITIAL_FREE_VAL  = 0;
+const  size_t INITIAL_FREE_VAL  = 1;
 const  size_t MAX_TESTING_SIZE  = 100;
 typedef const char * const string;
 

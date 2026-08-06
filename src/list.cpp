@@ -17,67 +17,117 @@ void lst_perror() {
     fprintf(stderr,  RED "[ОШИБКА]: " RESET "%s\n", lst_last_error);
 }
 
-LstErrors add_element_after_internal(list_t * list, size_t index, list_el_t value) {
+LstErrors ListRealloc(list_t *list) {
     sassert(list, _LST_ERR_PTR_NULL);
 
-    int size     = list->size;
-    int capacity = list->capacity;
-    _LST_RETURN_ERR(index <= size, _LST_ERR_INVALID_INDEX,
-                    "вы пытаетесь вставить после индекса %zu, но размер %zu", index, size);
-    _LST_RETURN_ERR(list->data[index] != DATA_POISON || !size, _LST_ERR_INVALID_INDEX,
-                    "вы пытаетесь вставить после некорректного индекса, возможно он уже был удален?");
+    int old_capacity = list->capacity;
+    list->capacity *= 2;
 
-    if (size == capacity) {
-        reallocate_array((void **) &list->data, capacity, capacity * 2 * sizeof(list_el_t));
-        reallocate_array((void **) &list->next, capacity, capacity * 2 * sizeof(list_el_t));
-        reallocate_array((void **) &list->prev, capacity, capacity * 2 * sizeof(list_el_t));
-        list->capacity *= 2;
+    if(reallocate_array((void **) (&(list->data)), old_capacity, list->capacity * sizeof(list_el_t))  == NULL |
+       reallocate_array((void **) (&(list->next)), old_capacity, list->capacity * sizeof(int))        == NULL |
+       reallocate_array((void **) (&(list->prev)), old_capacity, list->capacity * sizeof(int))        == NULL |
+       reallocate_array((void **) (&(list->free)), old_capacity, list->capacity * sizeof(int))        == NULL)
+        return _LST_ERR_REALLOC_FAIL;
+
+    
+    for (size_t i = old_capacity; i < list->capacity; i++) {
+        list->free[i] = i + 1;
+        list->next[i] = POISON;
+        list->prev[i] = POISON;
+        list->data[i] = DATA_POISON;
     }
 
+    return _LST_OK;
+}
+
+LstErrors add_element_after_internal(list_t *list, size_t index, list_el_t value) {
+    sassert(list, _LST_ERR_PTR_NULL);
+
+    int capacity = list->capacity;
+    if (list->size >= capacity - 1) {
+        _LST_RETURN_ERR(ListRealloc(list) == _LST_OK, _LST_ERR_REALLOC_FAIL,
+                        "не удалось увеличить размер списка, capacity: %d", capacity);
+    }
+
+    _LST_RETURN_ERR(index < (size_t) capacity, _LST_ERR_INVALID_INDEX,
+                    "попытка вставки после несуществующего индекса %zu (capacity=%d)", index, capacity);
+
+    _LST_RETURN_ERR(index == 0 || list->data[index] != DATA_POISON, _LST_ERR_INVALID_INDEX,
+                    "попытка вставки после удалённого узла %zu", index);
+
     int free = list->last_free;
-    list->last_free     = list->free[free];
-    list->data[free]    = value;
+    list->last_free = list->free[free];
 
-    int next = list->next[index];
-    list->next[free]    = next;
-    list->prev[next]    = free;
-    list->next[index]   = free;
+    list->data[free] = value;
+    list->prev[free] = (int) index;
+    list->next[free] = list->next[index];
 
-    if (size)
-        list->prev[free] = index;
-    if (index == list->head)
-        list->head = free;
-        
+    list->prev[list->next[index]] = free;
+    list->next[index] = free;
+
+    list->size++;
+    return _LST_OK;
+}
+
+LstErrors add_element_before_internal(list_t *list, size_t index, list_el_t value) {
+    sassert(list, _LST_ERR_PTR_NULL);
+
+    int capacity = list->capacity;
+    if (list->size >= capacity - 1) {
+        _LST_RETURN_ERR(ListRealloc(list), _LST_ERR_REALLOC_FAIL,
+                        "не удалось увеличить размер списка");
+    }
+
+    _LST_RETURN_ERR(index < (size_t) capacity, _LST_ERR_INVALID_INDEX,
+                    "попытка вставки перед несуществующим индексом %zu (capacity=%d)", index, capacity);
+
+    _LST_RETURN_ERR(index == 0 || list->data[index] != DATA_POISON, _LST_ERR_INVALID_INDEX,
+                    "попытка вставки перед удалённым узлом %zu", index);
+
+    int free = list->last_free;
+    list->last_free = list->free[free];
+
+    list->data[free] = value;
+    list->prev[free] = list->prev[index];
+    list->next[free] = (int) index;
+
+    list->next[list->prev[index]] = free;
+    list->prev[index] = free;
+
     list->size++;
     return _LST_OK;
 }
 
 LstErrors remove_element_internal(list_t *list, size_t index) {
     sassert(list, _LST_ERR_PTR_NULL);
-    
-    size_t size     = list->size;
-    size_t capacity = list->capacity;
-    _LST_RETURN_ERR(index <= size && list->size != 0, _LST_ERR_INVALID_INDEX,
-                    "вы пытаетесь вставить после индекса %zu, но размер %zu", index, size);
-    _LST_RETURN_ERR(list->data[index] != DATA_POISON || !size, _LST_ERR_INVALID_INDEX,
-                    "вы пытаетесь вставить после некорректного индекса %zu, возможно он уже был удален?", index);
 
-    list->free[index] = list->last_free;
-    list->last_free   = index;
+    int size     = list->size;
+    int capacity = list->capacity;
 
-    int prev = list->prev[index];
-    int next = list->next[index];
-    list->next[prev] = list->next[index];
-    list->prev[next] = prev;
+    // index == 0 удалять нельзя - это служебный узел кольца
+    _LST_RETURN_ERR(index > 0 && index < (size_t) capacity, _LST_ERR_INVALID_INDEX,
+                    "попытка удалить служебный узел или неверный индекс %zu, capacity=%d", index, capacity);
+
+    _LST_RETURN_ERR(list->data[index] != DATA_POISON, _LST_ERR_INVALID_INDEX,
+                    "попытка удалить уже удалённый узел %zu (size=%d)", index, size);
+
+    int prev_node = list->prev[index];
+    int next_node = list->next[index];
+
+    list->next[prev_node] = next_node;
+    list->prev[next_node] = prev_node;
 
     #ifdef STRING_TYPE
         SMART_FREE(list->data[index]);
     #endif
-    list->data[index] = (list_el_t) DATA_POISON;
+    list->data[index] = DATA_POISON;
     list->next[index] = POISON;
     list->prev[index] = POISON;
-    list->size--;
 
+    list->free[index] = list->last_free;
+    list->last_free = index;
+
+    list->size--;
     return _LST_OK;
 }
 
@@ -103,7 +153,7 @@ void listDtor_internal(list_t *list) {
 void print_order_of_data(FILE * fp, list_t *list) {
     sassert(fp, _LST_ERR_PTR_NULL);
 
-    int current = list->tail;
+    int current = list->next[0];
     for (size_t i = 0; i < list->size; i++) {
         if (current > list->capacity || current == POISON)
             break;
@@ -115,73 +165,34 @@ void print_order_of_data(FILE * fp, list_t *list) {
 void listCtor_internal(list_t *list) {
     sassert(list, _LST_ERR_PTR_NULL);
 
-    list->tail = INITIAL_TAIL_VAL;
-    list->head = INITIAL_HEAD_VAL;
-
     list->size = 0;
     list->capacity = START_LIST_SIZE;
-
 
     list->data = (list_el_t *) calloc(START_LIST_SIZE, sizeof(list_el_t));
     sassert(list->data, _LST_ERR_PTR_NULL);
     initialize_with_poison(list->data, (list_el_t) DATA_POISON);
 
-
     list->next = (int *) calloc(START_LIST_SIZE, sizeof(int));
     sassert(list->next, _LST_ERR_PTR_NULL);
     initialize_with_poison(list->next, POISON);
-
 
     list->prev = (int *) calloc(START_LIST_SIZE, sizeof(int));
     sassert(list->prev, _LST_ERR_PTR_NULL);
     initialize_with_poison(list->prev, POISON);
 
-
     list->free = (int *) calloc(START_LIST_SIZE, sizeof(int));
     sassert(list->free, _LST_ERR_PTR_NULL);
-    for (size_t i = 0; i < START_LIST_SIZE - 1; i++) {
-        list->free[i] = i + 1;
-    }
-    list->free[START_LIST_SIZE - 1] = POISON;
+
+    list->next[0]   = INITIAL_TAIL_VAL;
+    list->prev[0]   = INITIAL_HEAD_VAL;
     list->last_free = INITIAL_FREE_VAL;
 
-    return;
-}
-
-LstErrors add_element_before_internal(list_t *list, size_t index, list_el_t value) {
-    sassert(list, _LST_ERR_PTR_NULL);
-
-    size_t size     = list->size;
-    size_t capacity = list->capacity;
-
-    
-    _LST_RETURN_ERR(index <= size, _LST_ERR_INVALID_INDEX,
-                    "вы пытаетесь вставить перед индексом %zu, но размер %zu", index, size);
-    _LST_RETURN_ERR(list->data[index] != DATA_POISON || !size, _LST_ERR_INVALID_INDEX,
-                    "вы пытаетесь вставить после некорректного индекса %zu, возможно он уже был удален?", index);
-
-    if (size == capacity) {
-        reallocate_array((void **) &list->data, capacity, capacity * 2 * sizeof(list_el_t));
-        reallocate_array((void **) &list->next, capacity, capacity * 2 * sizeof(list_el_t));
-        reallocate_array((void **) &list->prev, capacity, capacity * 2 * sizeof(list_el_t));
-        list->capacity *= 2;
+    list->free[0] = POISON;
+    for (size_t i = 1; i < START_LIST_SIZE; i++) {
+        list->free[i] = i + 1;
     }
 
-    int free            = list->last_free;
-    list->last_free     = list->free[list->last_free];
-    list->data[free]    = value;
-
-    list->prev[free]    = list->prev[index];
-    list->next[free]    = index;
-
-    if (index != list->tail) 
-        list->next[list->prev[index]] = free;
-    else
-        list->tail = free;
-
-    list->prev[index]   = free;
-    list->size++;
-    return _LST_OK;
+    return;
 }
 
 void listCtor(list_t *list) {
@@ -267,16 +278,16 @@ LstErrors append(list_t *list, list_el_const_t value) {
     #ifdef DEBUG
         if (create_dot_image_dump(list) != _LST_OK)
             lst_perror();
-        if (print_to_html(list, START, list->head, (list_el_t) DATA_POISON) != _LST_OK)
+        if (print_to_html(list, START, list->prev[0], (list_el_t) DATA_POISON) != _LST_OK)
             lst_perror();
     #endif
 
-    LstErrors result = add_element_after_internal(list, list->head, data);
+    LstErrors result = add_element_after_internal(list, list->prev[0], data);
 
     #ifdef DEBUG
         if (create_dot_image_dump(list) != _LST_OK)
             lst_perror();
-        if (print_to_html(list, ADD_AFTER, list->head, data) != _LST_OK)
+        if (print_to_html(list, ADD_AFTER, list->prev[0], data) != _LST_OK)
             lst_perror();
     #endif
 
