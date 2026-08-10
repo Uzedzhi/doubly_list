@@ -168,7 +168,7 @@ LstErrors add_error_to_html(FILE *fp, list_t *list) {
 LstErrors verify_list(list_t *list) {
     sassert(list, _LST_ERR_PTR_NULL);
 
-    int last_free        = list->last_free;
+    int last_free   = list->last_free;
     int head        = list->prev[0];
     int tail        = list->next[0];
     int current     = tail;
@@ -185,6 +185,7 @@ LstErrors verify_list(list_t *list) {
     int AllPrevsSize    = 0;
     int AllNextsSize    = 0;
     int AllCurrentsSize = 0;
+
     LstErrors Error = _LST_OK;
     while (current != POISON && current != 0) {
         VERIFIER_RETURN_FREE(count_els <= size - 1, _LST_ERR_INVALID_SIZE,
@@ -358,7 +359,7 @@ LstErrors create_dot_image_dump(list_t *list) {
 
     current = list->prev[0];
     count_els = 0;
-    while (current != POISON && current <= list->size && count_els <= list->size && list->prev[current] != 0) {
+    while (current != POISON && count_els <= list->size && list->prev[current] != 0) {
         int prev = list->prev[current];
         if (prev > -1 && prev < list->capacity && current != prev)
             fprintf(fp, "data_array_info%d->data_array_info%d [constraint=false, weight=1,color=\"#ff0084ff\", minlen=4]\n", current, prev);
