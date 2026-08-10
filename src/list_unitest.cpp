@@ -30,7 +30,7 @@ bool check_order(list_t *list, FILE *fp) {
 
     list_el_t value = 0;
     int count = 0;
-    int current = list->prev[0];
+    int current = list->next[0];
     #ifdef STRING_TYPE
         while ((fscanf(fp, "%s ", value) == 1)) {
     #else
@@ -51,8 +51,8 @@ bool check_order(list_t *list, FILE *fp) {
 void reinitialize_list(list_t *list) {
     sassert(list, _LST_ERR_PTR_NULL);
 
-    list->prev[0] = INITIAL_TAIL_VAL;
-    list->next[0] = INITIAL_HEAD_VAL;
+    list->next[0] = INITIAL_TAIL_VAL;
+    list->prev[0] = INITIAL_HEAD_VAL;
 
     list->last_free = 0;
     for (size_t i = START_LIST_SIZE; i > 0; i--) {
